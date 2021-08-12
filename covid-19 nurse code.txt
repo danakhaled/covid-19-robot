@@ -1,0 +1,155 @@
+#define trigPin 11
+#define echoPin 12
+#define earthpump 9
+#define pump 10
+//right motor car
+#define speedL1 5 //pwm
+#define In11 27
+#define In21 26
+#define In31 28
+#define In41 29
+#define speedR1 6 //pwm
+//left motor car
+#define speedL2 7 //pwm
+#define In12 22
+#define In22 23
+#define In32 25
+#define In42 24
+#define speedR2 8 //pwm
+//oxmeter
+#include <Wire.h>
+#include "MAX30100_PulseOximeter.h"
+#define REPORTING_PERIOD_MS 1000
+PulseOximeter pox;
+uint32_t tsLastReport = 0;
+#include <Wire.h>
+#include <Servo.h>
+int masaha_angle=72;
+int base_angle=170;
+int middleKnee_angle=60;
+int endKnee_angle=40;
+int grapper_angle=60;
+#include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+#include <Adafruit_MLX90614.h>
+Adafruit_MLX90614 mlx = Adafruit_MLX90614();
+Servo masaha,base,middleKnee,endKnee,grapper;
+long duration, distance;
+char reading;
+void onBeatDetected()
+{
+
+}
+void setup() {
+Serial1.begin (9600);
+lcd.init(); // or some librarys are lcd.init();
+lcd.backlight();
+lcd.setCursor(6,0);
+lcd.print("Smart Robot");
+//increas angle the endKnee move down
+endKnee.attach(46);
+endKnee.write(endKnee_angle);
+// increse angle the middleKnee move up
+middleKnee.attach(50);
+middleKnee.write(middleKnee_angle);
+// increase angle the base move down
+base.attach(52);
+base.write(base_angle);
+//increase angle the robot arm open grapper
+grapper.attach(48);
+grapper.write(grapper_angle);
+masaha.attach(44);
+masaha.write(masaha_angle);
+pinMode(trigPin, OUTPUT);
+pinMode(echoPin, INPUT);
+pinMode(earthpump,OUTPUT);
+pinMode(pump,OUTPUT);
+ for(int i=22;i<=29;i++)
+ {
+ pinMode(i,OUTPUT);
+ }
+ for(int j=5;j<=8;j++)
+ {
+ pinMode(j,OUTPUT);
+ }
+ Serial.begin(115200);
+ Serial.print("Initializing pulse oximeter..");
+ // Initialize the PulseOximeter instance
+ // Failures are generally due to an improper I2C wiring, missing power supply
+ // or wrong target chip
+}
+void ultrasonic()
+{
+ digitalWrite(trigPin, LOW);
+delayMicroseconds(2);
+digitalWrite(trigPin, HIGH);
+delayMicroseconds(10);
+digitalWrite(trigPin, LOW);
+duration = pulseIn(echoPin, HIGH);
+ distance = (duration/2) * 0.0343; // 343 * (100/1000000) = 343/10000
+ if(distance<6&&distance>3)pumpAlcohol();
+}
+void temp()
+{
+ mlx.begin();
+ while(reading=='G')
+ {
+ if(Serial1.available()>0)
+ {reading=Serial1.read();}
+ lcd.setCursor(0,1);
+// Serial.print("Ambient = "); Serial.print(mlx.readAmbientTempC());
+ lcd.print("temp = ");
+ lcd.setCursor(6,1);
+ lcd.print(" ");
+ lcd.setCursor(6,1);
+ lcd.print(mlx.readObjectTempC());
+// Serial.print("Ambient = "); Serial.print(mlx.readAmbientTempF()); 
+// Serial.print("*F\tObject = "); Serial.print(mlx.readObjectTempF()); Serial.println("*F");
+ delay(500);
+ }
+}
+void pumpAlcohol()
+{
+ digitalWrite(10,HIGH);
+ delay(250);
+ digitalWrite(10,0);
+ delay(1000);
+}
+void oxmeterr()
+{
+ if (!pox.begin())
+ {
+ Serial.println("FAILED");
+ for(;;);
+ }
+ else
+ {
+ Serial.println("SUCCESS");
+ }
+ pox.setIRLedCurrent(MAX30100_LED_CURR_7_6MA);
+ // Register a callback for the beat detection
+ pox.setOnBeatDetectedCallback(onBeatDetected);
+ // Make sure to call update as fast as possible
+ while(reading=='V')
+ {
+ if(Serial1.available()>0)
+ {reading=Serial1.read();}
+ pox.update();
+ if (millis() - tsLastReport > REPORTING_PERIOD_MS)
+ {
+ lcd.setCursor(0,2);
+ lcd.print("Heart rate:");
+ lcd.setCursor(12,2);
+ lcd.print(" ");
+ lcd.setCursor(12,2);
+ lcd.print(pox.getHeartRate());
+ lcd.setCursor(0,3);
+ lcd.print("bpm / SpO2:");
+ lcd.setCursor(12,3);
+ lcd.print(" ");
+ lcd.setCursor(12,3);
+ lcd.print(pox.getSpO2());
+ lcd.print("%");
+ tsLastReport = millis();
+ }
+ }
